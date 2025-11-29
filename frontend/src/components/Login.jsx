@@ -118,7 +118,7 @@ export default function Login({ onSubmit, onGoRegister, onGoReset }) {
               onGoReset ? onGoReset() : fallbackNavigate("/reset-password")
             }
           >
-            Mot de passe oublie ?
+            Mot de passe oublié ?
           </button>
           <span className="divider">{"\u2022"}</span>
           <button
@@ -128,7 +128,7 @@ export default function Login({ onSubmit, onGoRegister, onGoReset }) {
               onGoRegister ? onGoRegister() : fallbackNavigate("/register")
             }
           >
-            Creer un compte
+            Créer un compte
           </button>
         </div>
       </div>

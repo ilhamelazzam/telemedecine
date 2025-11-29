@@ -21,7 +21,7 @@ export default function ResetPassword({ onSubmit, onGoLogin }) {
 
   const validateEmail = () => {
     if (!email) {
-      setErrors({ email: 'Email est requis' });
+      setErrors({ email: 'Email requis' });
       return false;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -44,15 +44,15 @@ export default function ResetPassword({ onSubmit, onGoLogin }) {
     if (!newPassword) {
       newErrors.newPassword = 'Nouveau mot de passe requis';
     } else if (newPassword.length < 8) {
-      newErrors.newPassword = 'Au moins 8 caractères requis';
+      newErrors.newPassword = 'Au moins 8 caracteres requis';
     } else if (!/[A-Z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
       newErrors.newPassword = 'Au moins 1 majuscule et 1 chiffre requis';
     }
-    
+
     if (newPassword !== confirmPassword) {
       newErrors.confirmPassword = 'Les mots de passe ne correspondent pas';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -63,11 +63,8 @@ export default function ResetPassword({ onSubmit, onGoLogin }) {
       setIsLoading(true);
       try {
         await onSubmit({ step: 'email', email });
-        setSuccessMessage('Code de vérification envoyé à votre email');
-        setTimeout(() => {
-          setStep('code');
-          setSuccessMessage('');
-        }, 1500);
+        setSuccessMessage('Code de verification envoye a votre email');
+        setStep('code');
       } finally {
         setIsLoading(false);
       }
@@ -80,11 +77,8 @@ export default function ResetPassword({ onSubmit, onGoLogin }) {
       setIsLoading(true);
       try {
         await onSubmit({ step: 'code', email, code });
-        setSuccessMessage('Code vérifié avec succès');
-        setTimeout(() => {
-          setStep('newPassword');
-          setSuccessMessage('');
-        }, 1500);
+        setSuccessMessage('Code verifie, choisissez un nouveau mot de passe');
+        setStep('newPassword');
       } finally {
         setIsLoading(false);
       }
@@ -97,10 +91,8 @@ export default function ResetPassword({ onSubmit, onGoLogin }) {
       setIsLoading(true);
       try {
         await onSubmit({ step: 'newPassword', email, code, newPassword });
-        setSuccessMessage('Mot de passe r?initialis? avec succ??s');
-        setTimeout(() => {
-          navigateToLogin();
-        }, 1500);
+        setSuccessMessage('Mot de passe reinitialise avec succes');
+        setTimeout(() => navigateToLogin(), 1200);
       } finally {
         setIsLoading(false);
       }
@@ -110,19 +102,16 @@ export default function ResetPassword({ onSubmit, onGoLogin }) {
   return (
     <div className="auth-container">
       <div className="auth-card fade-in">
-        {/* Header */}
         <div className="auth-header">
-          <div className="auth-icon">🏥</div>
-          <h1 className="auth-title">TéleMédecine</h1>
-          <p className="auth-subtitle">Réinitialiser votre mot de passe</p>
+          <div className="auth-icon">🔒</div>
+          <h1 className="auth-title">TeleMedecine</h1>
+          <p className="auth-subtitle">Reinitialiser votre mot de passe</p>
         </div>
 
-        {/* Success Message */}
         {successMessage && (
           <div className="success-message fade-in">{successMessage}</div>
         )}
 
-        {/* Step 1: Email */}
         {step === 'email' && (
           <form onSubmit={handleEmailSubmit} className="auth-form">
             <div className="form-group">
@@ -155,16 +144,15 @@ export default function ResetPassword({ onSubmit, onGoLogin }) {
           </form>
         )}
 
-        {/* Step 2: Code */}
         {step === 'code' && (
           <form onSubmit={handleCodeSubmit} className="auth-form">
             <p className="step-description">
-              Un code de vérification a été envoyé à <strong>{email}</strong>
+              Un code de verification a ete envoye a <strong>{email}</strong>
             </p>
-            
+
             <div className="form-group">
               <label htmlFor="code" className="form-label">
-                Code de vérification
+                Code de verification
               </label>
               <input
                 id="code"
@@ -188,7 +176,7 @@ export default function ResetPassword({ onSubmit, onGoLogin }) {
               disabled={isLoading}
               className="btn-primary btn-pulse"
             >
-              {isLoading ? 'Vérification...' : 'Vérifier le code'}
+              {isLoading ? 'Verification...' : 'Verifier le code'}
             </button>
 
             <button
@@ -196,12 +184,11 @@ export default function ResetPassword({ onSubmit, onGoLogin }) {
               onClick={() => setStep('email')}
               className="btn-secondary"
             >
-              Retour
+              Retour 
             </button>
           </form>
         )}
 
-        {/* Step 3: New Password */}
         {step === 'newPassword' && (
           <form onSubmit={handlePasswordSubmit} className="auth-form">
             <div className="form-group">
@@ -217,7 +204,7 @@ export default function ResetPassword({ onSubmit, onGoLogin }) {
                   if (errors.newPassword) setErrors({ ...errors, newPassword: '' });
                 }}
                 className={`form-input ${errors.newPassword ? 'input-error' : ''}`}
-                placeholder="••••••••"
+                placeholder="********"
               />
               {errors.newPassword && (
                 <span className="error-message slide-in">{errors.newPassword}</span>
@@ -237,7 +224,7 @@ export default function ResetPassword({ onSubmit, onGoLogin }) {
                   if (errors.confirmPassword) setErrors({ ...errors, confirmPassword: '' });
                 }}
                 className={`form-input ${errors.confirmPassword ? 'input-error' : ''}`}
-                placeholder="••••••••"
+                placeholder="********"
               />
               {errors.confirmPassword && (
                 <span className="error-message slide-in">{errors.confirmPassword}</span>
@@ -249,19 +236,18 @@ export default function ResetPassword({ onSubmit, onGoLogin }) {
               disabled={isLoading}
               className="btn-primary btn-pulse"
             >
-              {isLoading ? 'Réinitialisation...' : 'Réinitialiser'}
+              {isLoading ? 'Reinitialisation...' : 'Reinitialiser'}
             </button>
           </form>
         )}
 
-        {/* Footer Links */}
         <div className="auth-footer">
           <button
             type="button"
             className="link-secondary"
             onClick={() => navigateToLogin()}
           >
-            Retour ?? la connexion
+             Retour à la connexion
           </button>
         </div>
       </div>

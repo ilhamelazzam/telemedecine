@@ -1,6 +1,7 @@
 package com.telemedecine.telemedecine_backend.model;
 
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "patients")
@@ -24,6 +25,12 @@ public class Patient {
     private String address;
 
     private String region;
+
+    @Column(name = "reset_code", length = 20)
+    private String resetCode;
+
+    @Column(name = "reset_code_expiry")
+    private LocalDateTime resetCodeExpiry;
 
     // ====== getters & setters ======
 
@@ -73,6 +80,22 @@ public class Patient {
 
     public void setRegion(String region) {
         this.region = region;
+    }
+
+    public String getResetCode() {
+        return resetCode;
+    }
+
+    public void setResetCode(String resetCode) {
+        this.resetCode = resetCode;
+    }
+
+    public LocalDateTime getResetCodeExpiry() {
+        return resetCodeExpiry;
+    }
+
+    public void setResetCodeExpiry(LocalDateTime resetCodeExpiry) {
+        this.resetCodeExpiry = resetCodeExpiry;
     }
 
     public String getPassword() {
