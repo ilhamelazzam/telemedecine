@@ -1,0 +1,9 @@
+Aiven Postgres connection info (fill before use)
+SERVICE_URI=postgres://PASSWORD@pg-cde689a-elazzamilham2-41a7.k.aivencloud.com:14101/defaultdb?sslmode=require
+HOST=pg-cde689a-elazzamilham2-41a7.k.aivencloud.com
+PORT=14101
+DATABASE=defaultdb
+USER=avnadmin
+PASSWORD=CHANGE_ME
+SSL_MODE=require
+CA_CERT=ca.pem
