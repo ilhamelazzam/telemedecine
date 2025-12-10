@@ -3,11 +3,12 @@ package com.telemedecine.telemedecine_backend.controller;
 import com.telemedecine.telemedecine_backend.dto.LoginRequest;
 import com.telemedecine.telemedecine_backend.dto.LoginResponse;
 import com.telemedecine.telemedecine_backend.dto.RegisterPatientRequest;
+import com.telemedecine.telemedecine_backend.dto.ResetPasswordRequest;
 import com.telemedecine.telemedecine_backend.dto.ResetRequest;
 import com.telemedecine.telemedecine_backend.dto.VerifyCodeRequest;
-import com.telemedecine.telemedecine_backend.dto.ResetPasswordRequest;
 import com.telemedecine.telemedecine_backend.model.Patient;
 import com.telemedecine.telemedecine_backend.repository.PatientRepository;
+import com.telemedecine.telemedecine_backend.service.AuthService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -30,12 +31,14 @@ public class AuthController {
     private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     private final PatientRepository patientRepository;
+    private final AuthService authService;
     private final JavaMailSender mailSender;
 
     @Value("${app.mail.from:no-reply@telemedecine.local}")
     private String fromEmail;
 
-    public AuthController(PatientRepository patientRepository, JavaMailSender mailSender) {
+    public AuthController(AuthService authService, PatientRepository patientRepository, JavaMailSender mailSender) {
+        this.authService = authService;
         this.patientRepository = patientRepository;
         this.mailSender = mailSender;
     }
@@ -43,73 +46,40 @@ public class AuthController {
     // ========= Inscription patient =========
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterPatientRequest request) {
-
-        // Vérifier si l'email existe déjà
-        Optional<Patient> existing = patientRepository.findByEmail(request.getEmail());
-        if (existing.isPresent()) {
-            return ResponseEntity
-                    .status(HttpStatus.BAD_REQUEST)
-                    .body("Cet email est déjà utilisé.");
+        try {
+            Patient saved = authService.register(request);
+            LoginResponse response = toLoginResponse(saved, "Inscription réussie");
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        } catch (Exception e) {
+            log.error("Erreur pendant l'inscription", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Impossible de créer le compte pour le moment.");
         }
-
-        // Créer le patient
-        Patient patient = new Patient();
-        patient.setFullName(request.getFullName());
-        patient.setEmail(request.getEmail());
-        patient.setPassword(request.getPassword()); // plus tard : hash avec BCrypt
-        patient.setPhone(request.getPhone());
-        patient.setAddress(request.getAddress());
-        patient.setRegion(request.getRegion());
-
-        Patient saved = patientRepository.save(patient);
-
-        LoginResponse response = new LoginResponse(
-                saved.getId(),
-                saved.getFullName(),
-                saved.getEmail(),
-                "Inscription réussie"
-        );
-
-        return ResponseEntity.ok(response);
     }
 
     // ========= Connexion patient =========
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
-
-        Optional<Patient> existingOpt = patientRepository.findByEmail(request.getEmail());
-
-        if (existingOpt.isEmpty()) {
-            return ResponseEntity
-                    .status(HttpStatus.UNAUTHORIZED)
-                    .body("Email ou mot de passe incorrect.");
+        try {
+            Patient patient = authService.login(request);
+            return ResponseEntity.ok(toLoginResponse(patient, "Connexion réussie"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
+        } catch (Exception e) {
+            log.error("Erreur pendant la connexion", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Impossible de vérifier vos informations pour le moment.");
         }
-
-        Patient existing = existingOpt.get();
-
-        // Comparaison simple (plus tard : mot de passe hashé)
-        if (!existing.getPassword().equals(request.getPassword())) {
-            return ResponseEntity
-                    .status(HttpStatus.UNAUTHORIZED)
-                    .body("Email ou mot de passe incorrect.");
-        }
-
-        LoginResponse response = new LoginResponse(
-                existing.getId(),
-                existing.getFullName(),
-                existing.getEmail(),
-                "Connexion réussie"
-        );
-
-        return ResponseEntity.ok(response);
     }
 
     // ========= Demande de reset (envoie code) =========
     @PostMapping("/reset-request")
     public ResponseEntity<?> resetRequest(@RequestBody ResetRequest request) {
-        Optional<Patient> patientOpt = patientRepository.findByEmail(request.getEmail());
+        Optional<Patient> patientOpt = authService.findByEmail(request.getEmail());
         if (patientOpt.isEmpty()) {
-            // Ne pas révéler si l'email existe en prod — ici on renvoie erreur pour le dev
+            // Ne pas révéler si l'email existe en prod – ici on renvoie erreur pour le dev
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Email introuvable.");
         }
 
@@ -139,7 +109,7 @@ public class AuthController {
     // ========= Vérifier le code =========
     @PostMapping("/verify-code")
     public ResponseEntity<?> verifyCode(@RequestBody VerifyCodeRequest request) {
-        Optional<Patient> patientOpt = patientRepository.findByEmail(request.getEmail());
+        Optional<Patient> patientOpt = authService.findByEmail(request.getEmail());
         if (patientOpt.isEmpty()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Email introuvable.");
         }
@@ -156,7 +126,7 @@ public class AuthController {
     // ========= Reset password avec code =========
     @PostMapping("/reset-password")
     public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest request) {
-        Optional<Patient> patientOpt = patientRepository.findByEmail(request.getEmail());
+        Optional<Patient> patientOpt = authService.findByEmail(request.getEmail());
         if (patientOpt.isEmpty()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Email introuvable.");
         }
@@ -168,13 +138,22 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Code expiré.");
         }
 
-        // Mettre à jour le mot de passe
-        patient.setPassword(request.getNewPassword()); // plus tard: hash
-        // Effacer le code
-        patient.setResetCode(null);
-        patient.setResetCodeExpiry(null);
-        patientRepository.save(patient);
+        authService.updatePassword(patient, request.getNewPassword());
 
         return ResponseEntity.ok("Mot de passe réinitialisé");
+    }
+
+    private LoginResponse toLoginResponse(Patient patient, String message) {
+        return new LoginResponse(
+                patient.getId(),
+                patient.getFirstName(),
+                patient.getLastName(),
+                patient.getEmail(),
+                patient.getPhone(),
+                patient.getAddress(),
+                patient.getRegion(),
+                patient.getAuthToken(),
+                message
+        );
     }
 }

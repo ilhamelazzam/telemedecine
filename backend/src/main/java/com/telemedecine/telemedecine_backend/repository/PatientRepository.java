@@ -10,4 +10,6 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
 	Optional<Patient> findByEmail(String email);
 
 	Optional<Patient> findByResetCode(String resetCode);
+
+	Optional<Patient> findByAuthToken(String authToken);
 }

@@ -3,17 +3,28 @@ package com.telemedecine.telemedecine_backend.dto;
 public class LoginResponse {
 
     private Long id;
-    private String fullName;
+    private String firstName;
+    private String lastName;
     private String email;
+    private String phone;
+    private String address;
+    private String region;
+    private String token;
     private String message;
 
     public LoginResponse() {
     }
 
-    public LoginResponse(Long id, String fullName, String email, String message) {
+    public LoginResponse(Long id, String firstName, String lastName, String email, String phone,
+                         String address, String region, String token, String message) {
         this.id = id;
-        this.fullName = fullName;
+        this.firstName = firstName;
+        this.lastName = lastName;
         this.email = email;
+        this.phone = phone;
+        this.address = address;
+        this.region = region;
+        this.token = token;
         this.message = message;
     }
 
@@ -25,12 +36,20 @@ public class LoginResponse {
         this.id = id;
     }
 
-    public String getFullName() {
-        return fullName;
+    public String getFirstName() {
+        return firstName;
     }
 
-    public void setFullName(String fullName) {
-        this.fullName = fullName;
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
+    }
+
+    public String getLastName() {
+        return lastName;
+    }
+
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
     }
 
     public String getEmail() {
@@ -39,6 +58,38 @@ public class LoginResponse {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public String getAddress() {
+        return address;
+    }
+
+    public void setAddress(String address) {
+        this.address = address;
+    }
+
+    public String getRegion() {
+        return region;
+    }
+
+    public void setRegion(String region) {
+        this.region = region;
+    }
+
+    public String getToken() {
+        return token;
+    }
+
+    public void setToken(String token) {
+        this.token = token;
     }
 
     public String getMessage() {
