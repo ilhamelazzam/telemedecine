@@ -35,35 +35,44 @@ class PatientNavigation extends StatelessWidget {
                 ],
               ),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            padding: EdgeInsets.only(
+              left: 8,
+              right: 8,
+              top: MediaQuery.of(context).padding.top + 8,
+              bottom: 12,
+            ),
             child: Row(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.menu, color: Colors.white),
+                  icon: const Icon(Icons.menu, color: Colors.white, size: 28),
                   onPressed: () {
                     Scaffold.of(context).openDrawer();
                   },
                 ),
-                const Text(
-                  'TéléMédecine',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    letterSpacing: 0.5,
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'TéléMédecine',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                 ),
-                const Spacer(),
-                Text(
-                  'Bienvenue, ${userName ?? "Utilisateur"}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.white70,
+                if (MediaQuery.of(context).size.width > 600) ...[
+                  Text(
+                    'Bienvenue, ${userName ?? "Utilisateur"}',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Colors.white70,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 16),
+                  const SizedBox(width: 8),
+                ],
                 IconButton(
-                  icon: const Icon(Icons.logout, color: Colors.white),
+                  icon: const Icon(Icons.logout, color: Colors.white, size: 24),
                   onPressed: () => _handleLogout(context),
                   tooltip: 'Déconnexion',
                 ),
@@ -74,14 +83,15 @@ class PatientNavigation extends StatelessWidget {
           Expanded(
             child: Row(
               children: [
-                // Sidebar
-                _buildSidebar(context),
+                // Sidebar (only on larger screens)
+                if (MediaQuery.of(context).size.width > 768)
+                  _buildSidebar(context),
                 // Main content
                 Expanded(
                   child: Container(
                     color: AppTheme.background,
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(32),
+                      padding: const EdgeInsets.all(16),
                       child: child,
                     ),
                   ),

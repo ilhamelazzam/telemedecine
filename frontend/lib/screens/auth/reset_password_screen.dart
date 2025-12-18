@@ -191,21 +191,24 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   const SizedBox(height: 36),
 
                   // Step indicator
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       _buildStepIndicator(1, ResetStep.email),
                       Container(
-                        width: 40,
+                        width: 30,
                         height: 2,
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
                         color: _currentStep.index > 0
                             ? AppTheme.primary
                             : AppTheme.textSecondary.withOpacity(0.3),
                       ),
                       _buildStepIndicator(2, ResetStep.code),
                       Container(
-                        width: 40,
+                        width: 30,
                         height: 2,
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
                         color: _currentStep.index > 1
                             ? AppTheme.primary
                             : AppTheme.textSecondary.withOpacity(0.3),

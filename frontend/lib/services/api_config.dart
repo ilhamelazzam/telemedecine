@@ -1,10 +1,12 @@
 class ApiConfig {
   // Changez cette URL selon votre backend
-  static const String baseUrl = 'http://localhost:8080/api';
-  // Alternative: 'http://localhost:4000'
+  // Pour émulateur Android: 'http://10.0.2.2:8080/api'
+  // Pour appareil physique sur même réseau: 'http://192.168.X.X:8080/api'
+  // Pour localhost: 'http://localhost:8080/api'
+  static const String baseUrl = 'http://10.0.2.2:8080/api';
   
   // Mode démo : activez ceci pour utiliser des données mockées
-  static const bool useDemoMode = true; // Mettez à false pour utiliser le vrai backend
+  static const bool useDemoMode = false; // Mettez à false pour utiliser le vrai backend
 
   // Auth endpoints
   static const String loginEndpoint = '$baseUrl/auth/login';

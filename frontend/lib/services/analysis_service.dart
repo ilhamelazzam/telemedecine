@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../models/analysis.dart';
 import '../services/auth_service.dart';
 import 'api_config.dart';
+import 'http_service.dart';
 
 class AnalysisService {
   final AuthService _authService = AuthService();
@@ -14,72 +15,78 @@ class AnalysisService {
     required List<String> categories,
     String? imagePath,
   }) async {
+    if (ApiConfig.useDemoMode) {
+      await Future.delayed(const Duration(seconds: 2));
+      return _createMockAnalysis(symptoms, categories);
+    }
+
     try {
       final token = await _authService.getToken();
       
-      // Prepare form data or JSON
+      // Prepare request body
       final body = {
         'symptoms': symptoms,
         'categories': categories,
         if (imagePath != null) 'imageUrl': imagePath,
       };
 
-      final response = await http.post(
-        Uri.parse(ApiConfig.analysisEndpoint),
-        headers: ApiConfig.getHeaders(token: token),
-        body: jsonEncode(body),
+      final data = await HttpService.post(
+        ApiConfig.analysisEndpoint,
+        body,
+        token: token,
       );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(response.body);
-        return Analysis.fromJson(data);
-      } else {
-        // For demo purposes, return a mock analysis
-        return _createMockAnalysis(symptoms, categories);
-      }
+      return Analysis.fromJson(data);
     } catch (e) {
-      // For demo purposes, return a mock analysis
-      return _createMockAnalysis(symptoms, categories);
+      throw Exception('Échec de l\'analyse: ${e.toString()}');
     }
   }
 
   // Get analysis history
   Future<List<Analysis>> getAnalysisHistory() async {
+    if (ApiConfig.useDemoMode) {
+      await Future.delayed(const Duration(seconds: 1));
+      return _getMockHistory();
+    }
+
     try {
       final token = await _authService.getToken();
       
-      final response = await http.get(
-        Uri.parse(ApiConfig.analysisHistoryEndpoint),
-        headers: ApiConfig.getHeaders(token: token),
+      final data = await HttpService.get(
+        ApiConfig.analysisHistoryEndpoint,
+        token: token,
       );
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data is List) {
-          return data.map((json) => Analysis.fromJson(json)).toList();
-        }
+      if (data is List) {
+        return data.map((json) => Analysis.fromJson(json as Map<String, dynamic>)).toList();
       }
       
-      // Return mock data for demo
-      return _getMockHistory();
+      return [];
     } catch (e) {
-      // Return mock data for demo
-      return _getMockHistory();
+      throw Exception('Échec de récupération de l\'historique: ${e.toString()}');
     }
   }
 
   // Get single analysis
   Future<Analysis> getAnalysis(String id) async {
+    if (ApiConfig.useDemoMode) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      final mockHistory = _getMockHistory();
+      return mockHistory.firstWhere(
+        (a) => a.id == id,
+        orElse: () => mockHistory.first,
+      );
+    }
+
     try {
       final token = await _authService.getToken();
       
-      final response = await http.get(
-        Uri.parse('${ApiConfig.analysisEndpoint}/$id'),
-        headers: ApiConfig.getHeaders(token: token),
+      final data = await HttpService.get(
+        '${ApiConfig.analysisEndpoint}/$id',
+        token: token,
       );
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+      if (data != null) {
         return Analysis.fromJson(data);
       } else {
         throw Exception('Analyse non trouvée');
