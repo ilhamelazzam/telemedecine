@@ -95,8 +95,8 @@ class SymptomAnalyzer:
                     'Consulter si douleur persistante'
                 ]
             },
-            'fevr e': {
-                'symptoms': ['fièvre', 'température', 'chaud', 'froid', 'frisson'],
+            'fievre': {
+                'symptoms': ['fièvre', 'température', 'chaud', 'froid', 'frisson', '39', '38', 'febr', 'transpire'],
                 'diagnosis': 'État fébrile - Infection possible',
                 'severity': 'élevé',
                 'recommendations': [
@@ -344,8 +344,8 @@ class ImageAnalyzer:
 
 
 # Initialiser les analyseurs
-symptom_analyzer = SymptomAnalyzer()
-image_analyzer = ImageAnalyzer()
+symptom_analyzer = SymptomAnalyzer(ML_MODEL_PATH)
+image_analyzer = ImageAnalyzer(CNN_MODEL_PATH)
 
 
 # ============================================

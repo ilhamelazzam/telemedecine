@@ -5,9 +5,11 @@ import com.telemedecine.telemedecine_backend.dto.AiAnalysisResponse;
 import com.telemedecine.telemedecine_backend.dto.AnalysisRequest;
 import com.telemedecine.telemedecine_backend.dto.AnalysisResponse;
 import com.telemedecine.telemedecine_backend.model.Analysis;
+import com.telemedecine.telemedecine_backend.model.Notification;
 import com.telemedecine.telemedecine_backend.model.Patient;
 import com.telemedecine.telemedecine_backend.model.SeverityLevel;
 import com.telemedecine.telemedecine_backend.repository.AnalysisRepository;
+import com.telemedecine.telemedecine_backend.repository.NotificationRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -37,6 +39,7 @@ public class AnalysisService {
             "nausée", "douleurs musculaires");
 
     private final AnalysisRepository analysisRepository;
+    private final NotificationRepository notificationRepository;
     private final RestTemplate restTemplate;
 
     @Value("${ai.service.url:http://localhost:5000}")
@@ -45,8 +48,9 @@ public class AnalysisService {
     @Value("${ai.service.enabled:true}")
     private boolean aiServiceEnabled;
 
-    public AnalysisService(AnalysisRepository analysisRepository, RestTemplate restTemplate) {
+    public AnalysisService(AnalysisRepository analysisRepository, NotificationRepository notificationRepository, RestTemplate restTemplate) {
         this.analysisRepository = analysisRepository;
+        this.notificationRepository = notificationRepository;
         this.restTemplate = restTemplate;
     }
 
@@ -79,7 +83,39 @@ public class AnalysisService {
             applyFallbackAnalysis(analysis, categories);
         }
 
-        return analysisRepository.save(analysis);
+        Analysis savedAnalysis = analysisRepository.save(analysis);
+        
+        // Create notification for the analysis
+        createAnalysisNotification(patient, savedAnalysis);
+        
+        return savedAnalysis;
+    }
+    
+    private void createAnalysisNotification(Patient patient, Analysis analysis) {
+        String title;
+        String message;
+        String type;
+        
+        switch (analysis.getSeverity()) {
+            case HIGH:
+                title = "⚠️ Analyse terminée - Attention requise";
+                message = "Votre analyse révèle des symptômes nécessitant une attention médicale. Diagnostic: " + analysis.getDiagnosis();
+                type = "WARNING";
+                break;
+            case MEDIUM:
+                title = "📋 Analyse terminée";
+                message = "Votre analyse est disponible. Diagnostic: " + analysis.getDiagnosis();
+                type = "INFO";
+                break;
+            default:
+                title = "✅ Analyse terminée";
+                message = "Votre analyse est disponible. Diagnostic: " + analysis.getDiagnosis();
+                type = "SUCCESS";
+                break;
+        }
+        
+        Notification notification = new Notification(patient, title, message, type);
+        notificationRepository.save(notification);
     }
 
     private AiAnalysisResponse callAiService(String symptoms, List<String> categories, String imageUrl) {
@@ -91,7 +127,7 @@ public class AnalysisService {
 
             String endpoint = (imageUrl != null && !imageUrl.isBlank()) 
                 ? aiServiceUrl + "/api/ai/analyze-image"
-                : aiServiceUrl + "/api/ai/analyze";
+                : aiServiceUrl + "/api/ai/analyze-symptoms";
 
             ResponseEntity<AiAnalysisResponse> response = restTemplate.postForEntity(
                 endpoint,
@@ -118,9 +154,14 @@ public class AnalysisService {
         if (aiSeverity == null) {
             return SeverityLevel.LOW;
         }
-        return switch (aiSeverity.toUpperCase()) {
-            case "HIGH", "ÉLEVÉE", "ELEVEE", "URGENT" -> SeverityLevel.HIGH;
-            case "MEDIUM", "MOYENNE", "MODÉRÉE", "MODEREE" -> SeverityLevel.MEDIUM;
+        String normalized = aiSeverity.toUpperCase()
+            .replace("É", "E")
+            .replace("È", "E");
+        
+        return switch (normalized) {
+            case "HIGH", "ELEVEE", "ELEVE", "URGENT", "SEVERE" -> SeverityLevel.HIGH;
+            case "MEDIUM", "MOYENNE", "MODEREE", "MODERE" -> SeverityLevel.MEDIUM;
+            case "LOW", "FAIBLE", "BAS" -> SeverityLevel.LOW;
             default -> SeverityLevel.LOW;
         };
     }
