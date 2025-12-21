@@ -37,13 +37,13 @@ class AuthService {
       );
 
       final user = User.fromJson(data);
-      
+
       // Save token and user data
       if (user.token != null) {
         await _saveToken(user.token!);
         await _saveUser(user);
       }
-      
+
       return user;
     } catch (e) {
       throw Exception('Connexion échouée: ${e.toString()}');
@@ -82,22 +82,23 @@ class AuthService {
       final data = await HttpService.post(
         ApiConfig.registerEndpoint,
         {
-          'fullName': '$firstName $lastName'.trim(),
+          'firstName': firstName,
+          'lastName': lastName,
           'email': email,
           'password': password,
-          'phone': phone,
-          'address': address,
-          'region': region,
+          if (phone != null) 'phone': phone,
+          if (address != null) 'address': address,
+          if (region != null) 'region': region,
         },
       );
 
       final user = User.fromJson(data);
-      
+
       if (user.token != null) {
         await _saveToken(user.token!);
         await _saveUser(user);
       }
-      
+
       return user;
     } catch (e) {
       throw Exception('Inscription échouée: ${e.toString()}');
@@ -217,4 +218,3 @@ class AuthService {
     await prefs.setString(_userKey, jsonEncode(user.toJson()));
   }
 }
-

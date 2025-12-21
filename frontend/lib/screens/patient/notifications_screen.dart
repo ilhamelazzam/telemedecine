@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../widgets/common/app_card.dart';
 import '../../models/notification.dart' as models;
+import '../../services/notification_service.dart';
 import '../../theme/app_theme.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -11,63 +12,109 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  // Mock notifications - in real app, fetch from service
-  final List<models.AppNotification> _notifications = [
-    models.AppNotification(
-      id: '1',
-      type: models.NotificationType.info,
-      title: 'Rappel de santé',
-      message: 'N\'oubliez pas de boire de l\'eau régulièrement',
-      timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-      read: false,
-    ),
-    models.AppNotification(
-      id: '2',
-      type: models.NotificationType.alert,
-      title: 'Alerte importante',
-      message: 'Surveillez votre température si la fièvre persiste',
-      timestamp: DateTime.now().subtract(const Duration(hours: 4)),
-      read: false,
-    ),
-    models.AppNotification(
-      id: '3',
-      type: models.NotificationType.success,
-      title: 'Mise à jour complétée',
-      message: 'Votre historique d\'analyses a été mis à jour',
-      timestamp: DateTime.now().subtract(const Duration(days: 1)),
-      read: true,
-    ),
-    models.AppNotification(
-      id: '4',
-      type: models.NotificationType.info,
-      title: 'Rappel de consultation',
-      message: 'Pensez à vérifier votre suivi médical régulier',
-      timestamp: DateTime.now().subtract(const Duration(days: 2)),
-      read: true,
-    ),
-  ];
+  final _notificationService = NotificationService();
+  List<models.AppNotification> _notifications = [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotifications();
+  }
+
+  Future<void> _loadNotifications() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final notifications = await _notificationService.getNotifications();
+      setState(() {
+        _notifications = notifications;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
 
   int get _unreadCount {
     return _notifications.where((n) => !n.read).length;
   }
 
-  void _markAsRead(String id) {
-    setState(() {
-      final index = _notifications.indexWhere((n) => n.id == id);
-      if (index != -1) {
-        _notifications[index] = _notifications[index].copyWith(read: true);
+  Future<void> _markAsRead(String id) async {
+    try {
+      await _notificationService.markAsRead(id);
+      setState(() {
+        final index = _notifications.indexWhere((n) => n.id == id);
+        if (index != -1) {
+          _notifications[index] = _notifications[index].copyWith(read: true);
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: ${e.toString()}'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
       }
-    });
+    }
   }
 
-  void _deleteNotification(String id) {
-    setState(() {
-      _notifications.removeWhere((n) => n.id == id);
-    });
+  Future<void> _deleteNotification(String id) async {
+    try {
+      await _notificationService.deleteNotification(id);
+      setState(() {
+        _notifications.removeWhere((n) => n.id == id);
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: ${e.toString()}'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: AppTheme.error),
+            const SizedBox(height: 16),
+            const Text(
+              'Erreur de chargement',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(_error!, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadNotifications,
+              child: const Text('Réessayer'),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Center(
       child: Container(
         constraints: const BoxConstraints(maxWidth: 600),

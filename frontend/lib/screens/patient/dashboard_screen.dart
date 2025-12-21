@@ -3,8 +3,11 @@ import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_card.dart';
 import '../../theme/app_theme.dart';
 import '../../models/analysis.dart';
+import '../../models/notification.dart' as models;
+import '../../services/analysis_service.dart';
+import '../../services/notification_service.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   final VoidCallback? onAnalysisClick;
   final VoidCallback? onHistoryClick;
 
@@ -15,36 +18,83 @@ class DashboardScreen extends StatelessWidget {
   });
 
   @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  final _analysisService = AnalysisService();
+  final _notificationService = NotificationService();
+  
+  Analysis? _lastAnalysis;
+  List<models.AppNotification> _notifications = [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDashboardData();
+  }
+
+  Future<void> _loadDashboardData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      // Load analysis history and notifications in parallel
+      final results = await Future.wait([
+        _analysisService.getAnalysisHistory(),
+        _notificationService.getNotifications(),
+      ]);
+
+      final analyses = results[0] as List<Analysis>;
+      final notifications = results[1] as List<models.AppNotification>;
+
+      setState(() {
+        _lastAnalysis = analyses.isNotEmpty ? analyses.first : null;
+        _notifications = notifications;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Mock data - in real app, fetch from service
-    final lastAnalysis = Analysis(
-      id: '1',
-      date: DateTime.now().subtract(const Duration(days: 0)),
-      symptoms: 'Toux légère, fatigue',
-      categories: ['🤧 Toux', '😴 Fatigue'],
-      severity: SeverityLevel.low,
-      diagnosis: 'Probable infection virale bénigne',
-    );
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-    final notifications = [
-      {
-        'type': 'info',
-        'message': 'Rappel: Buvez de l\'eau régulièrement',
-        'read': false,
-      },
-      {
-        'type': 'alert',
-        'message': 'Surveillez votre température',
-        'read': false,
-      },
-      {
-        'type': 'info',
-        'message': 'Analyse précédente mise à jour',
-        'read': true,
-      },
-    ];
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: AppTheme.error),
+            const SizedBox(height: 16),
+            Text(
+              'Erreur de chargement',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(_error!, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            AppButton(
+              text: 'Réessayer',
+              onPressed: _loadDashboardData,
+            ),
+          ],
+        ),
+      );
+    }
 
-    final unreadCount = notifications.where((n) => n['read'] == false).length;
+    final unreadCount = _notifications.where((n) => !n.read).length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -69,94 +119,115 @@ class DashboardScreen extends StatelessWidget {
         const SizedBox(height: 32),
 
         // Last Analysis Card
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Dernière analyse IA',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textPrimary,
+        if (_lastAnalysis != null)
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Dernière analyse IA',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textPrimary,
+                      ),
                     ),
-                  ),
-                  _buildSeverityBadge(lastAnalysis.severity),
-                ],
-              ),
-              const SizedBox(height: 20),
-              _buildAnalysisItem('Date:', lastAnalysis.formattedDate),
-              _buildAnalysisItem('Symptômes:', lastAnalysis.symptoms),
-              _buildAnalysisItem('Diagnostic:', lastAnalysis.diagnosis ?? ''),
-              const SizedBox(height: 20),
-              AppButton(
-                text: 'Voir l\'historique complet',
-                onPressed: onHistoryClick,
-                isPrimary: false,
-                width: double.infinity,
-              ),
-            ],
+                    _buildSeverityBadge(_lastAnalysis!.severity),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                _buildAnalysisItem('Date:', _lastAnalysis!.formattedDate),
+                _buildAnalysisItem('Symptômes:', _lastAnalysis!.symptoms),
+                _buildAnalysisItem('Diagnostic:', _lastAnalysis!.diagnosis ?? ''),
+                const SizedBox(height: 20),
+                AppButton(
+                  text: 'Voir l\'historique complet',
+                  onPressed: widget.onHistoryClick,
+                  isPrimary: false,
+                  width: double.infinity,
+                ),
+              ],
+            ),
+          )
+        else
+          AppCard(
+            child: Column(
+              children: [
+                const Icon(Icons.info_outline, size: 48, color: AppTheme.textSecondary),
+                const SizedBox(height: 16),
+                const Text(
+                  'Aucune analyse disponible',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Commencez par faire votre première analyse',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppTheme.textSecondary),
+                ),
+              ],
+            ),
           ),
-        ),
         const SizedBox(height: 32),
 
         // Action Section
         AppButton(
           text: '📊 Faire une nouvelle analyse',
-          onPressed: onAnalysisClick,
+          onPressed: widget.onAnalysisClick,
           width: double.infinity,
         ),
         const SizedBox(height: 32),
 
         // Notifications Preview
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Notifications récentes',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                  if (unreadCount > 0)
-                    Container(
-                      width: 28,
-                      height: 28,
-                      decoration: const BoxDecoration(
-                        color: AppTheme.error,
-                        shape: BoxShape.circle,
+        if (_notifications.isNotEmpty)
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Notifications récentes',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimary,
                       ),
-                      child: Center(
-                        child: Text(
-                          '$unreadCount',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
+                    ),
+                    if (unreadCount > 0)
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: const BoxDecoration(
+                          color: AppTheme.error,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            '$unreadCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              ...notifications.take(3).map((notif) => _buildNotificationItem(
-                    notif['message'] as String,
-                    notif['type'] as String,
-                    notif['read'] as bool,
-                  )),
-            ],
+                  ],
+                ),
+                const SizedBox(height: 16),
+                ..._notifications.take(3).map((notif) => _buildNotificationItem(
+                      notif.message,
+                      notif.type,
+                      notif.read,
+                    )),
+              ],
+            ),
           ),
-        ),
       ],
     );
   }
@@ -231,7 +302,21 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildNotificationItem(String message, String type, bool read) {
+  Widget _buildNotificationItem(String message, models.NotificationType type, bool read) {
+    String icon;
+    switch (type) {
+      case models.NotificationType.alert:
+        icon = '⚠️';
+        break;
+      case models.NotificationType.success:
+        icon = '✅';
+        break;
+      case models.NotificationType.info:
+      default:
+        icon = 'ℹ️';
+        break;
+    }
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
@@ -240,9 +325,7 @@ class DashboardScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         border: Border(
           left: BorderSide(
-            color: read
-                ? Colors.grey.shade300
-                : AppTheme.primary,
+            color: read ? Colors.grey.shade300 : AppTheme.primary,
             width: 3,
           ),
         ),
@@ -250,7 +333,7 @@ class DashboardScreen extends StatelessWidget {
       child: Row(
         children: [
           Text(
-            type == 'alert' ? '⚠️' : 'ℹ️',
+            icon,
             style: const TextStyle(fontSize: 18),
           ),
           const SizedBox(width: 12),

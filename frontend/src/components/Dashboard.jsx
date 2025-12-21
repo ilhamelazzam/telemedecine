@@ -1,14 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { analysisApi } from "../services/api"
 
 export function PatientDashboard({ onAnalysisClick, onHistoryClick }) {
-  const [lastAnalysis] = useState({
-    date: "21 Nov 2024",
-    symptoms: "Toux légère, fatigue",
-    severity: "Low",
-    diagnosis: "Probable infection virale bénigne",
-  })
+  const [lastAnalysis, setLastAnalysis] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   const [notifications] = useState([
     { id: 1, type: "info", message: "Rappel: Buvez de l'eau régulièrement", read: false },
@@ -17,6 +15,25 @@ export function PatientDashboard({ onAnalysisClick, onHistoryClick }) {
   ])
 
   const unreadCount = notifications.filter((n) => !n.read).length
+
+  useEffect(() => {
+    const fetchLastAnalysis = async () => {
+      try {
+        setLoading(true)
+        const history = await analysisApi.getHistory()
+        if (history && history.length > 0) {
+          setLastAnalysis(history[0])
+        }
+      } catch (err) {
+        setError(err.message)
+        console.error("Error fetching last analysis:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchLastAnalysis()
+  }, [])
 
   return (
     <div className="patient-dashboard fade-in">
@@ -28,31 +45,48 @@ export function PatientDashboard({ onAnalysisClick, onHistoryClick }) {
 
       {/* Last Analysis Card */}
       <section className="dashboard-section">
-        <div className="card-container">
-          <div className="card-header">
-            <h3>Dernière analyse IA</h3>
-            <span className={`severity-badge severity-${lastAnalysis.severity.toLowerCase()}`}>
-              {lastAnalysis.severity}
-            </span>
+        {loading ? (
+          <div className="card-container">
+            <p>Chargement...</p>
           </div>
-          <div className="card-body">
-            <div className="analysis-item">
-              <span className="label">Date:</span>
-              <span className="value">{lastAnalysis.date}</span>
-            </div>
-            <div className="analysis-item">
-              <span className="label">Symptômes:</span>
-              <span className="value">{lastAnalysis.symptoms}</span>
-            </div>
-            <div className="analysis-item">
-              <span className="label">Diagnostic:</span>
-              <span className="value">{lastAnalysis.diagnosis}</span>
-            </div>
+        ) : error ? (
+          <div className="card-container">
+            <p className="error-message">Erreur: {error}</p>
           </div>
-          <button className="btn-secondary" onClick={onHistoryClick}>
-            Voir l'historique complet
-          </button>
-        </div>
+        ) : lastAnalysis ? (
+          <div className="card-container">
+            <div className="card-header">
+              <h3>Dernière analyse IA</h3>
+              <span className={`severity-badge severity-${lastAnalysis.severity.toLowerCase()}`}>
+                {lastAnalysis.severity}
+              </span>
+            </div>
+            <div className="card-body">
+              <div className="analysis-item">
+                <span className="label">Date:</span>
+                <span className="value">{new Date(lastAnalysis.performedAt).toLocaleDateString('fr-FR')}</span>
+              </div>
+              <div className="analysis-item">
+                <span className="label">Symptômes:</span>
+                <span className="value">{lastAnalysis.symptoms}</span>
+              </div>
+              <div className="analysis-item">
+                <span className="label">Diagnostic:</span>
+                <span className="value">{lastAnalysis.diagnosis}</span>
+              </div>
+            </div>
+            <button className="btn-secondary" onClick={onHistoryClick}>
+              Voir l'historique complet
+            </button>
+          </div>
+        ) : (
+          <div className="card-container">
+            <p>Aucune analyse disponible. Commencez par faire une nouvelle analyse!</p>
+            <button className="btn-primary" onClick={onAnalysisClick}>
+              Faire une analyse
+            </button>
+          </div>
+        )}
       </section>
 
       {/* Action Section */}

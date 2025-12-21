@@ -3,6 +3,7 @@ import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_input.dart';
 import '../../widgets/common/app_card.dart';
 import '../../models/profile.dart';
+import '../../services/profile_service.dart';
 import '../../theme/app_theme.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -18,38 +19,71 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  final _profileService = ProfileService();
   bool _editMode = false;
+  bool _isLoading = true;
+  String? _error;
   late UserProfile _profileData;
   late UserProfile _formData;
 
   @override
   void initState() {
     super.initState();
-    // Mock profile data - in real app, fetch from service
-    _profileData = UserProfile(
-      userId: '1',
-      firstName: 'Jean',
-      lastName: 'Dupont',
-      email: 'jean.dupont@example.com',
-      phone: '+33 6 12 34 56 78',
-      chronicDiseases: 'Asthme léger',
-      allergies: 'Pénicilline',
-      language: 'fr',
-    );
-    _formData = _profileData;
+    _loadProfile();
   }
 
-  void _handleSave() {
+  Future<void> _loadProfile() async {
     setState(() {
-      _profileData = _formData;
-      _editMode = false;
+      _isLoading = true;
+      _error = null;
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Profil mis à jour avec succès'),
-        backgroundColor: AppTheme.success,
-      ),
-    );
+
+    try {
+      final profile = await _profileService.getProfile();
+      setState(() {
+        _profileData = profile;
+        _formData = profile;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _handleSave() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final updatedProfile = await _profileService.updateProfile(_formData);
+      setState(() {
+        _profileData = updatedProfile;
+        _editMode = false;
+        _isLoading = false;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profil mis à jour avec succès'),
+            backgroundColor: AppTheme.success,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: ${e.toString()}'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+    }
   }
 
   void _handleCancel() {
@@ -86,6 +120,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null && !_editMode) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: AppTheme.error),
+            const SizedBox(height: 16),
+            Text(
+              'Erreur de chargement',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(_error!, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            AppButton(
+              text: 'Réessayer',
+              onPressed: _loadProfile,
+            ),
+          ],
+        ),
+      );
+    }
+
     return Center(
       child: Container(
         constraints: const BoxConstraints(maxWidth: 600),

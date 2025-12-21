@@ -1,31 +1,83 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { authApi, profileApi } from "../services/api"
 
 export function UserProfile({ onLogout }) {
   const [editMode, setEditMode] = useState(false)
   const [profileData, setProfileData] = useState({
-    firstName: "Jean",
-    lastName: "Dupont",
-    email: "jean.dupont@example.com",
-    phone: "+33 6 12 34 56 78",
-    chronicDiseases: "Asthme léger",
-    allergies: "Pénicilline",
-    language: "fr",
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    address: "",
+    region: "",
   })
-
   const [formData, setFormData] = useState(profileData)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    const loadProfile = () => {
+      try {
+        setLoading(true)
+        const user = authApi.getCurrentUser()
+        if (user) {
+          const userProfile = {
+            firstName: user.firstName || "",
+            lastName: user.lastName || "",
+            email: user.email || "",
+            phone: user.phone || "",
+            address: user.address || "",
+            region: user.region || "",
+          }
+          setProfileData(userProfile)
+          setFormData(userProfile)
+        }
+      } catch (err) {
+        setError(err.message)
+        console.error("Error loading profile:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadProfile()
+  }, [])
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleSave = () => {
-    // TODO: Appelez votre API pour mettre à jour le profil
-    setProfileData(formData)
-    setEditMode(false)
-    console.log("[v0] Profile updated:", formData)
+  const handleSave = async () => {
+    try {
+      setSaving(true)
+      setError(null)
+      await profileApi.updateProfile(formData)
+      setProfileData(formData)
+      setEditMode(false)
+      
+      // Update localStorage
+      const user = authApi.getCurrentUser()
+      const updatedUser = { ...user, ...formData }
+      localStorage.setItem("user", JSON.stringify(updatedUser))
+    } catch (err) {
+      setError(err.message)
+      authApi.logout()
+      onLogout?.()
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="user-profile fade-in">
+        <div className="profile-container">
+          <p>Chargement du profil...</p>
+        </div>
+      </div>
+    )
   }
 
   const handleCancel = () => {

@@ -1,46 +1,49 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { analysisApi } from "../services/api"
 
 export function AnalysisHistory({ onSelectAnalysis, onNewAnalysis }) {
   const [sortBy, setSortBy] = useState("date")
+  const [analyses, setAnalyses] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  const [analyses] = useState([
-    {
-      id: 1,
-      date: "21 Nov 2024",
-      symptoms: "Toux légère, fatigue",
-      severity: "Low",
-      icon: "🟢",
-    },
-    {
-      id: 2,
-      date: "18 Nov 2024",
-      symptoms: "Mal à la gorge, fièvre",
-      severity: "Medium",
-      icon: "🟡",
-    },
-    {
-      id: 3,
-      date: "15 Nov 2024",
-      symptoms: "Douleur dorsale, fatigue extrême",
-      severity: "High",
-      icon: "🔴",
-    },
-    {
-      id: 4,
-      date: "10 Nov 2024",
-      symptoms: "Légers symptômes de rhume",
-      severity: "Low",
-      icon: "🟢",
-    },
-  ])
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        setLoading(true)
+        const history = await analysisApi.getHistory()
+        setAnalyses(history || [])
+      } catch (err) {
+        setError(err.message)
+        console.error("Error fetching history:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchHistory()
+  }, [])
+
+  const getSeverityIcon = (severity) => {
+    switch (severity?.toLowerCase()) {
+      case "high":
+        return "🔴"
+      case "medium":
+        return "🟡"
+      case "low":
+        return "🟢"
+      default:
+        return "⚪"
+    }
+  }
 
   const sortedAnalyses = [...analyses].sort((a, b) => {
     if (sortBy === "date") {
-      return new Date(b.date) - new Date(a.date)
+      return new Date(b.performedAt) - new Date(a.performedAt)
     } else if (sortBy === "severity") {
-      const severityOrder = { High: 3, Medium: 2, Low: 1 }
+      const severityOrder = { HIGH: 3, MEDIUM: 2, LOW: 1 }
       return severityOrder[b.severity] - severityOrder[a.severity]
     }
     return 0
@@ -62,19 +65,37 @@ export function AnalysisHistory({ onSelectAnalysis, onNewAnalysis }) {
         </div>
 
         {/* Analyses List */}
-        <div className="analyses-list">
-          {sortedAnalyses.map((analysis) => (
-            <div key={analysis.id} className="analysis-card" onClick={() => onSelectAnalysis(analysis)}>
-              <div className="analysis-icon">{analysis.icon}</div>
-              <div className="analysis-info">
-                <h4 className="analysis-date">{analysis.date}</h4>
-                <p className="analysis-symptoms">{analysis.symptoms}</p>
+        {loading ? (
+          <div className="analyses-list">
+            <p>Chargement de l'historique...</p>
+          </div>
+        ) : error ? (
+          <div className="analyses-list">
+            <p className="error-message">Erreur: {error}</p>
+          </div>
+        ) : analyses.length === 0 ? (
+          <div className="analyses-list">
+            <p>Aucune analyse disponible. Commencez par faire une nouvelle analyse!</p>
+          </div>
+        ) : (
+          <div className="analyses-list">
+            {sortedAnalyses.map((analysis) => (
+              <div key={analysis.id} className="analysis-card" onClick={() => onSelectAnalysis(analysis)}>
+                <div className="analysis-icon">{getSeverityIcon(analysis.severity)}</div>
+                <div className="analysis-info">
+                  <h4 className="analysis-date">{new Date(analysis.performedAt).toLocaleDateString('fr-FR', { 
+                    day: 'numeric', 
+                    month: 'short', 
+                    year: 'numeric' 
+                  })}</h4>
+                  <p className="analysis-symptoms">{analysis.symptoms}</p>
+                </div>
+                <div className="analysis-severity">{analysis.severity}</div>
+                <span className="arrow">→</span>
               </div>
-              <div className="analysis-severity">{analysis.severity}</div>
-              <span className="arrow">→</span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* New Analysis Button */}
         <button className="btn-primary btn-large" onClick={onNewAnalysis}>

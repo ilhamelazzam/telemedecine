@@ -68,9 +68,11 @@ class Analysis {
   factory Analysis.fromJson(Map<String, dynamic> json) {
     return Analysis(
       id: json['id']?.toString() ?? json['_id']?.toString() ?? '',
-      date: json['date'] != null
-          ? DateTime.parse(json['date'])
-          : DateTime.now(),
+      date: json['performedAt'] != null
+          ? DateTime.parse(json['performedAt'])
+          : (json['date'] != null
+              ? DateTime.parse(json['date'])
+              : DateTime.now()),
       symptoms: json['symptoms'] ?? '',
       categories: json['categories'] != null
           ? List<String>.from(json['categories'])
@@ -111,6 +113,3 @@ class Analysis {
     };
   }
 }
-
-
-
