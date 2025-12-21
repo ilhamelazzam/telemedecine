@@ -1,12 +1,19 @@
 package com.telemedecine.telemedecine_backend.service;
 
+import com.telemedecine.telemedecine_backend.dto.AiAnalysisRequest;
+import com.telemedecine.telemedecine_backend.dto.AiAnalysisResponse;
 import com.telemedecine.telemedecine_backend.dto.AnalysisRequest;
 import com.telemedecine.telemedecine_backend.dto.AnalysisResponse;
 import com.telemedecine.telemedecine_backend.model.Analysis;
 import com.telemedecine.telemedecine_backend.model.Patient;
 import com.telemedecine.telemedecine_backend.model.SeverityLevel;
 import com.telemedecine.telemedecine_backend.repository.AnalysisRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -19,6 +26,8 @@ import java.util.stream.Stream;
 @Service
 public class AnalysisService {
 
+    private static final Logger log = LoggerFactory.getLogger(AnalysisService.class);
+
     private static final List<String> HIGH_SEVERITY_KEYWORDS = List.of(
             "essoufflement", "douleur thoracique", "perte de conscience", "saignement",
             "convulsions", "respiration difficile", "chute incontrôlée", "palpitation");
@@ -28,9 +37,17 @@ public class AnalysisService {
             "nausée", "douleurs musculaires");
 
     private final AnalysisRepository analysisRepository;
+    private final RestTemplate restTemplate;
 
-    public AnalysisService(AnalysisRepository analysisRepository) {
+    @Value("${ai.service.url:http://localhost:5000}")
+    private String aiServiceUrl;
+
+    @Value("${ai.service.enabled:true}")
+    private boolean aiServiceEnabled;
+
+    public AnalysisService(AnalysisRepository analysisRepository, RestTemplate restTemplate) {
         this.analysisRepository = analysisRepository;
+        this.restTemplate = restTemplate;
     }
 
     public Analysis createAnalysis(Patient patient, AnalysisRequest request) {
@@ -39,15 +56,73 @@ public class AnalysisService {
         analysis.setSymptoms(normalizeText(request.getSymptoms()));
         List<String> categories = safeList(request.getCategories());
         analysis.setCategories(new ArrayList<>(categories));
+        analysis.setImageUrl(request.getImageUrl());
+        analysis.setPerformedAt(LocalDateTime.now());
 
+        // Try AI service first, fallback to rule-based if unavailable
+        if (aiServiceEnabled) {
+            try {
+                AiAnalysisResponse aiResponse = callAiService(analysis.getSymptoms(), categories, request.getImageUrl());
+                if (aiResponse != null) {
+                    analysis.setSeverity(mapSeverityFromAi(aiResponse.getSeverity()));
+                    analysis.setDiagnosis(aiResponse.getDiagnosis());
+                    analysis.setRecommendations(new ArrayList<>(safeList(aiResponse.getRecommendations())));
+                    log.info("AI analysis successful. Model used: {}", aiResponse.getModelUsed());
+                } else {
+                    applyFallbackAnalysis(analysis, categories);
+                }
+            } catch (Exception e) {
+                log.warn("AI service unavailable, using fallback analysis: {}", e.getMessage());
+                applyFallbackAnalysis(analysis, categories);
+            }
+        } else {
+            applyFallbackAnalysis(analysis, categories);
+        }
+
+        return analysisRepository.save(analysis);
+    }
+
+    private AiAnalysisResponse callAiService(String symptoms, List<String> categories, String imageUrl) {
+        try {
+            AiAnalysisRequest aiRequest = new AiAnalysisRequest(symptoms, categories);
+            if (imageUrl != null && !imageUrl.isBlank()) {
+                aiRequest.setImageUrl(imageUrl);
+            }
+
+            String endpoint = (imageUrl != null && !imageUrl.isBlank()) 
+                ? aiServiceUrl + "/api/ai/analyze-image"
+                : aiServiceUrl + "/api/ai/analyze";
+
+            ResponseEntity<AiAnalysisResponse> response = restTemplate.postForEntity(
+                endpoint,
+                aiRequest,
+                AiAnalysisResponse.class
+            );
+
+            return response.getBody();
+        } catch (Exception e) {
+            log.error("Failed to call AI service at {}: {}", aiServiceUrl, e.getMessage());
+            throw e;
+        }
+    }
+
+    private void applyFallbackAnalysis(Analysis analysis, List<String> categories) {
         SeverityLevel severity = evaluateSeverity(analysis.getSymptoms(), categories);
         analysis.setSeverity(severity);
         analysis.setDiagnosis(determineDiagnosis(severity));
         analysis.setRecommendations(new ArrayList<>(recommendationsForSeverity(severity)));
-        analysis.setImageUrl(request.getImageUrl());
-        analysis.setPerformedAt(LocalDateTime.now());
+        log.info("Using fallback rule-based analysis");
+    }
 
-        return analysisRepository.save(analysis);
+    private SeverityLevel mapSeverityFromAi(String aiSeverity) {
+        if (aiSeverity == null) {
+            return SeverityLevel.LOW;
+        }
+        return switch (aiSeverity.toUpperCase()) {
+            case "HIGH", "ÉLEVÉE", "ELEVEE", "URGENT" -> SeverityLevel.HIGH;
+            case "MEDIUM", "MOYENNE", "MODÉRÉE", "MODEREE" -> SeverityLevel.MEDIUM;
+            default -> SeverityLevel.LOW;
+        };
     }
 
     public AnalysisResponse toResponse(Analysis analysis) {

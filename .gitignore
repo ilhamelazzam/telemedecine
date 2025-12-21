@@ -1,1 +1,5 @@
 aiven-db-connection.txt
+.fake
+backend/src/main/resources/application.properties
+.env
+*.env

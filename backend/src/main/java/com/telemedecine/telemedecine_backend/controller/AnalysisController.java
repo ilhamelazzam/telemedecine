@@ -16,7 +16,6 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/analysis")
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173"})
 public class AnalysisController {
 
     private final AuthService authService;

@@ -25,7 +25,6 @@ import java.util.Random;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173"}) // pour ton futur frontend React (dev)
 public class AuthController {
 
     private static final Logger log = LoggerFactory.getLogger(AuthController.class);
